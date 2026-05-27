@@ -1,0 +1,1 @@
+makeaibilli v3.0 — 2026-05-26 — custom logo support (drop image in data/)

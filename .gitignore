@@ -1,0 +1,23 @@
+# ── SECRETS — never commit these ─────────────────────
+# This is where your Finnhub key lives. Keeping it out of git
+# means your key never gets pushed to GitHub.
+.env
+.env.*
+!.env.template
+*.key
+secrets.yaml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
+data/
