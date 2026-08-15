@@ -15,6 +15,7 @@ services:
     env_file: [.env]
     environment:
       - REDIS_HOST=127.0.0.1
+      - TZ=America/New_York
       - DB_PATH=/data/makeaibilli.db
     volumes:
       - ./data:/data
@@ -28,6 +29,7 @@ services:
     env_file: [.env]
     environment:
       - REDIS_HOST=127.0.0.1
+      - TZ=America/New_York
       - DB_PATH=/data/makeaibilli.db
     volumes:
       - ./data:/data

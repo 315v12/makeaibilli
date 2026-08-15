@@ -27,7 +27,7 @@ def fetch_market_data(tickers: list[str]) -> dict:
     if not tickers:
         return {}
     try:
-        data = yf.download(" ".join(tickers), period="6mo", interval="1d",
+        data = yf.download(" ".join(tickers), period="1y", interval="1d",
                            progress=False, auto_adjust=True, group_by="ticker",
                            threads=True)
     except Exception:
@@ -58,6 +58,17 @@ def fetch_market_data(tickers: list[str]) -> dict:
             highs = df["High"].dropna().tail(14); lows = df["Low"].dropna().tail(14)
             atr = float((highs.values - lows.values).mean()) if len(highs) == len(lows) and len(highs) else round(price*0.02,2)
 
+            # ── longer-horizon momentum for the factor model ──────────────────
+            n = len(close)
+            # 6-month (~120 trading days) momentum
+            mom_120d = round((price/float(close.iloc[-min(121, n)]) - 1)*100, 2)
+            # 12-1 momentum (Jegadeesh-Titman): return over the year ENDING ~1 month
+            # ago, skipping the most recent month (which tends to mean-revert).
+            end_i   = -21 if n > 22 else -1                 # price ~1 month ago
+            start_i = -min(252, n)                          # price ~12 months ago
+            p_end   = float(close.iloc[end_i]); p_start = float(close.iloc[start_i])
+            mom_12_1 = round((p_end/p_start - 1)*100, 2) if p_start else 0.0
+
             out[t] = {
                 "ticker": t,
                 "category": category_of(t),
@@ -65,6 +76,8 @@ def fetch_market_data(tickers: list[str]) -> dict:
                 "mom_1d":  round((price/float(close.iloc[-2]) - 1)*100, 2),
                 "mom_5d":  round((price/float(close.iloc[-6]) - 1)*100, 2),
                 "mom_20d": round((price/float(close.iloc[-21]) - 1)*100, 2),
+                "mom_120d": mom_120d,
+                "mom_12_1": mom_12_1,
                 "vol_ratio": round(float(vol.iloc[-1])/avg_vol, 2) if avg_vol else 1.0,
                 "above_50ema":  price > ema50,
                 "above_200ema": price > ema200,

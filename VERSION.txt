@@ -1,1 +1,18 @@
-makeaibilli v3.0 — 2026-05-26 — custom logo support (drop image in data/)
+makeaibilli v4.0 (final)
+========================
+Trading intelligence dashboard — stocks + crypto — 24/7 signal collection,
+factor-based ranking, forward projections, pre-market decision passes.
+
+Highlights:
+  · Per-asset SQLite databases (one .db per stock/coin, 30-day retention)
+  · 6-factor composite score (momentum, trend, mean-reversion, volume,
+    relative strength, intel) z-scored across the universe
+  · Unique-tier assignment: every asset appears in exactly one tab
+  · Forward-looking expected-move projection (range + confidence bands)
+  · Pre-market decision passes at 08:40 and 09:25 ET
+  · Asset enrichment: Wikipedia + Wikidata for stocks, CoinGecko for crypto
+    (description, founders, founding date, headquarters — cached 30 days)
+  · IPO calendar with rich enrichment; Newly Listed tab for IPOs now trading
+  · Coinbase new-listing auto-detection (dynamic crypto universe)
+  · Full-screen chart page + "Open in TradingView ↗" escape hatch
+  · Position calculator on every asset (quantity × price = total)

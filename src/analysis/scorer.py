@@ -3,8 +3,8 @@ scorer.py — v2 multi-pass engine producing a 90-stock list every scan:
   30 SHORT (0-72h) · 30 LONG (4-30d) · 30 EXTRA-LONG (1-18mo).
 
 Flow (mirrors the requested pipeline):
-  1) web scraping      -> signals saved to the 15-day SQLite store
-  2) analyze/process   -> first-pass intel score per ticker (incl. 15-day history)
+  1) web scraping      -> signals saved to the 30-day SQLite store
+  2) analyze/process   -> first-pass intel score per ticker (incl. 30-day history)
   3) reprocess vs market performance (last 7 days, all stocks except crypto)
   4) reprocess again   -> relative-strength refinement, assign to best tier, rank
 
@@ -21,6 +21,8 @@ from analysis.technical import analyze, clear_cache
 from analysis.options import determine_direction
 from analysis.plan import build_plan
 from analysis.ranking import fetch_market_data, category_benchmarks
+from analysis.factors import compute_composites, factor_breakdown
+from analysis.projection import project, projection_sentence
 from analysis.universe import all_tickers
 from analysis.fortune500 import fortune_tickers
 from analysis.names import name_of, register_name, CRYPTO_BLOCK
@@ -49,7 +51,7 @@ def _gather(signals):
 
 
 def _intel_points(d):
-    """First-pass: how strongly the web (incl. 15-day history) points at this name."""
+    """First-pass: how strongly the web (incl. 30-day history) points at this name."""
     pts, why, cat = 0, [], None
     if d["earnings"]:
         pts += 22; why.append(f"Earnings catalyst: {d['earnings'][0]['headline'][:90]}")
@@ -101,55 +103,73 @@ def smooth_score(ticker: str, tier: str, new_score: float, alpha: float = 0.45) 
     return round(alpha * new_score + (1 - alpha) * _ewma(hist), 2)
 
 
-def _tier_scores(md, ta, ipts):
-    """Pass 3-4: blend intel with market performance into per-tier scores."""
-    short = ipts
-    if md["vol_ratio"]>=2: short+=12
-    elif md["vol_ratio"]>=1.5: short+=7
-    if md["mom_5d"]>3: short+=10
-    rsi = ta.get("rsi14",50) if ta else 50
-    if 28<=rsi<=42: short+=10
-    elif rsi>=68: short+=8
-    if ta and ta.get("macd_crossover"): short+=6
+def assign_unique_tiers(scored: list, per_tier: int) -> dict:
+    """Assign each asset to its SINGLE best-fit horizon so no asset appears in
+    more than one tab.
 
-    lng = int(ipts*0.5)
-    if md["above_50ema"]: lng+=15
-    if md["mom_20d"]>0: lng+=15
-    if 0<md["mom_5d"]<15: lng+=10
-    if md["above_200ema"]: lng+=10
+    Greedy: process assets strongest-first (by their best tier score) and place
+    each in its preferred tier; if that tier is already full, fall to its next
+    preference. This keeps every asset unique while keeping all three tabs as
+    full as the candidate pool allows.
+    """
+    tiers = ("short", "long", "xlong")
+    prefs = []
+    for s in scored:
+        order = sorted(tiers, key=lambda t: s.get(t, 0), reverse=True)   # best tier first
+        prefs.append((s.get(order[0], 0), s, order))
+    prefs.sort(key=lambda x: x[0], reverse=True)                          # strongest assets first
 
-    xl = int(ipts*0.3)
-    if md["above_200ema"]: xl+=30
-    if md["ema50"]>md["ema200"]: xl+=20
-    if md["mom_20d"]>0: xl+=15
-    if -5<=md["mom_20d"]<=40: xl+=10
+    buckets = {t: [] for t in tiers}
+    for _best, s, order in prefs:
+        for t in order:                       # try preferred tier, then fall back
+            if len(buckets[t]) < per_tier:
+                buckets[t].append(s)
+                break
+    for t in tiers:                           # final ordering within each tab
+        buckets[t].sort(key=lambda s: s.get(t, 0), reverse=True)
+    return buckets
 
-    return min(short,100), min(lng,100), min(xl,100)
 
 
 def run_scoring_cycle(include_fortune=False):
     clear_cache()
 
-    # ── 1) intel: fresh queue + 15-day history from the DB ────────────────────
+    # ── 1) intel: fresh queue + 30-day history from the per-asset DBs ─────────
     fresh = pop_signals(800)
-    history = signals_last_days(15)
+    history = signals_last_days(30)
     intel = _gather(fresh + history)
+
+    # Per-ticker signal accumulation over the 30-day window, straight from the
+    # database. This makes stored signal volume an explicit input to the final
+    # decision (sustained coverage = more conviction).
+    from collections import Counter
+    sig_count = Counter()
+    for s in history:
+        for t in (s.get("tickers") or []):
+            if t: sig_count[t.upper()] += 1
 
     # Candidate pool: web-surfaced + curated universe + watchlist (+ Fortune 500 on the slow clock)
     # KNOWN universe of real, tradeable tickers (curated + S&P 500 + watchlist).
     # We validate intel-surfaced tickers against this so junk words extracted from
     # text ("THE","GPU","VWAP","ONLY"...) never get sent to Yahoo.
     known = set(all_tickers()) | set(fortune_tickers()) | set(get_watchlist() or [])
+    # Recently-detected IPOs become first-class assets: once they're trading,
+    # market validation keeps them; if not trading yet, they're filtered out.
+    from utils.store import get_recent_ipos
+    ipo_tickers = {x["ticker"].upper() for x in get_recent_ipos(25)
+                   if x.get("ticker") and 1 <= len(x["ticker"]) <= 5}
+    known |= ipo_tickers
     surfaced_valid = {t for t in intel.keys() if t in known}     # only real names from chatter
-    candidates = surfaced_valid | set(all_tickers()) | set(get_watchlist() or [])
+    candidates = surfaced_valid | set(all_tickers()) | set(get_watchlist() or []) | ipo_tickers
     if include_fortune:
         candidates |= set(fortune_tickers())
     # Drop crypto-native names from the *recommendation* pool (their news still counted above)
     candidates = {c for c in candidates if c not in CRYPTO_BLOCK and 1 <= len(c) <= 5}
-    # Hardware guard: cap how many we price-validate per scan (intel names prioritized)
+    # Hardware guard: cap how many we price-validate per scan (intel + IPO names prioritized)
     MAX_CANDIDATES = int(__import__("os").getenv("MAX_CANDIDATES", 150))
     if len(candidates) > MAX_CANDIDATES:
-        intel_first = [t for t in intel.keys() if t in candidates and t not in CRYPTO_BLOCK]
+        intel_first = [t for t in (set(intel.keys()) | ipo_tickers)
+                       if t in candidates and t not in CRYPTO_BLOCK]
         rest = [t for t in candidates if t not in set(intel_first)]
         candidates = set(intel_first + rest[:max(0, MAX_CANDIDATES - len(intel_first))])
 
@@ -171,13 +191,38 @@ def run_scoring_cycle(include_fortune=False):
     deep_cap = 80 if include_fortune else 40
     deep = dict(rank_helper[:deep_cap])   # cap deep TA for the iMac
 
+    # ── PASS A: intel points + technical analysis (deep set) per ticker ───────
+    intel_pts_map, ta_map, meta = {}, {}, {}
     for ticker, md in market.items():
         d = intel.get(ticker, {"news":[],"reddit":[],"stocktwits":[],"sec":[],
             "congress":[],"influencer":[],"earnings":[],"ipo":[],"sources":set()})
         ipts, why, cat = _intel_points(d)
         ta = analyze(ticker) if ticker in deep else None
-        s_sc, l_sc, x_sc = _tier_scores(md, ta, ipts)
-        # Smooth against recent history so ranks don't whipsaw every 15 min
+        intel_pts_map[ticker] = ipts
+        ta_map[ticker] = ta
+        meta[ticker] = (d, why, cat)
+
+    # ── multi-factor composite (z-scored across the universe) + market regime ─
+    composites, regime = compute_composites(market, intel_pts_map, ta_map, bench)
+    log.info(f"  market regime: "
+             f"{'TRENDING (momentum tilt)' if regime>0 else 'CHOPPY/DOWN (mean-reversion tilt)' if regime<0 else 'NEUTRAL'}")
+
+    # ── PASS B: assemble per-ticker rows using the composite scores ───────────
+    for ticker, md in market.items():
+        d, why, cat = meta[ticker]
+        ta = ta_map[ticker]
+        comp = composites.get(ticker, {"short":0,"long":0,"xlong":0})
+        s_sc, l_sc, x_sc = comp["short"], comp["long"], comp["xlong"]
+        # Intel-first floor: a genuine scheduled catalyst stays visible regardless
+        # of how its chart looks (earnings/IPO/congressional buying).
+        if cat or d["congress"]:
+            s_sc = min(100, s_sc + 8); l_sc = min(100, l_sc + 8); x_sc = min(100, x_sc + 8)
+        # Database signal-history bonus: sustained coverage in the 30-day store
+        # adds conviction (up to +12). Directly accounts for stored signals.
+        sig_bonus = min(sig_count.get(ticker, 0) * 0.4, 12)
+        s_sc = min(100, s_sc + sig_bonus); l_sc = min(100, l_sc + sig_bonus); x_sc = min(100, x_sc + sig_bonus)
+        # Smooth against recent stored DECISIONS so ranks don't whipsaw cycle to
+        # cycle (EWMA over the per-asset decision history in the database).
         s_sc = smooth_score(ticker, "short", s_sc)
         l_sc = smooth_score(ticker, "long",  l_sc)
         x_sc = smooth_score(ticker, "xlong", x_sc)
@@ -195,15 +240,17 @@ def run_scoring_cycle(include_fortune=False):
 
         scored.append({"ticker":ticker,"md":md,"d":d,"cat":cat,"why":bullets[:5],
                        "rs":rs,"short":s_sc,"long":l_sc,"xlong":x_sc,
+                       "factors": factor_breakdown(md, ta, intel_pts_map[ticker], bench),
                        "direction": determine_direction(ta,0,
                            d["stocktwits"][0].get("bull_ratio",0.5) if d["stocktwits"] else 0.5)
                            if ta else "bullish"})
 
-    # ── 4) rank INDEPENDENTLY per tier, top 30 each (a stock may fit >1 horizon)
+    # ── 4) assign each stock to its SINGLE best-fit tier (no asset repeats
+    #        across tabs), then rank within each tier, top 30 each ────────────
     out = {"short":[], "long":[], "xlong":[]}
+    buckets = assign_unique_tiers(scored, PER_TIER)
     for tier in out:
-        members = sorted(scored, key=lambda s: s[tier], reverse=True)[:PER_TIER]
-        for i, s in enumerate(members):
+        for i, s in enumerate(buckets[tier]):
             s = dict(s)            # copy so per-tier fields don't collide
             s["best_score"] = s[tier]
             md = s["md"]
@@ -218,6 +265,8 @@ def run_scoring_cycle(include_fortune=False):
                 "buy_triggers": plan["buy_triggers"], "sell_triggers": plan["sell_triggers"],
                 "hold_label": plan["hold_label"], "exit_rule": plan["exit_rule"],
                 "catalyst_stamp": plan["catalyst_stamp"],
+                "factors": s.get("factors", {}),
+                "projection": project(md, tier),
                 "timestamp": datetime.now().strftime("%I:%M %p ET"),
             }
             out[tier].append(alert)

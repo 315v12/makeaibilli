@@ -36,7 +36,7 @@ def push_signal(signal: dict):
     queue = "crypto:signals:queue" if signal.get("asset") == "crypto" else "signals:queue"
     r.lpush(queue, json.dumps(signal))
     r.ltrim(queue, 0, 1499)
-    # persist to the 15-day store
+    # persist to the 30-day store
     try:
         from utils.store import save_signal
         save_signal(signal)

@@ -76,6 +76,9 @@ def metrics_from_candles(product_id: str) -> dict | None:
         "mom_1d":  round((price/closes[-2]-1)*100, 2) if len(closes) >= 2 else 0,
         "mom_5d":  round((price/closes[-6]-1)*100, 2) if len(closes) >= 6 else 0,
         "mom_20d": round((price/closes[-21]-1)*100, 2) if len(closes) >= 21 else 0,
+        "mom_120d": round((price/closes[-min(121, len(closes))]-1)*100, 2),
+        "mom_12_1": round((closes[-21 if len(closes) > 22 else -1]/closes[-min(252, len(closes))]-1)*100, 2)
+                    if closes[-min(252, len(closes))] else 0.0,
         "vol_ratio": round(vols[-1]/avg_vol, 2) if avg_vol else 1.0,
         "above_50ema":  price > ema50,
         "above_200ema": price > ema200,

@@ -30,53 +30,51 @@ def build_plan(ticker, tier, direction, catalyst, md):
     buys, sells = [], []
 
     # ── BUY triggers (each tied to a level on THIS chart) ─────────────────────
-    # 1. Scheduled catalyst (real, stock-specific date)
     if catalyst and catalyst.get("kind") == "earnings":
-        buys.append((f"Ahead of earnings {catalyst.get('when','')}",
-                     f"its own scheduled report — the move is event-driven, not a clock pattern"))
+        buys.append((f"Buy before earnings on {catalyst.get('when','')}",
+                     "earnings is the catalyst — position ahead of the report"))
     if catalyst and catalyst.get("kind") == "ipo":
-        buys.append((f"After {catalyst.get('when','')} listing settles",
-                     "let its first real prints establish a range"))
+        buys.append((f"Wait until after the {catalyst.get('when','')} listing settles",
+                     "let the first day of real trading establish a price range"))
 
-    # 2. Nearest support beneath price (pick the closest meaningful one)
     supports = []
-    if lo20 < p:  supports.append((lo20, "20-day support (recent floor it held)"))
-    if e50  < p:  supports.append((e50,  "50-day moving average (dynamic support)"))
-    if e200 < p:  supports.append((e200, "200-day line (major trend support)"))
-    if lo52 < p:  supports.append((lo52, "52-week low (deep-value floor)"))
-    supports.sort(key=lambda s: p - s[0])          # closest first
+    if lo20 < p:  supports.append((lo20, "recent 20-day low — price held here before"))
+    if e50  < p:  supports.append((e50,  "50-day moving average — short-term trend support"))
+    if e200 < p:  supports.append((e200, "200-day moving average — long-term trend support"))
+    if lo52 < p:  supports.append((lo52, "52-week low — major floor"))
+    supports.sort(key=lambda s: p - s[0])
     for lvl, why in supports[:2]:
-        buys.append((f"Buy the dip near ${lvl:.2f}", why))
+        buys.append((f"Buy when price drops to ${lvl:.2f}", why))
 
-    # 3. Breakout reclaim (if price is below a key MA, buying the reclaim)
     if p < e50:
-        buys.append((f"On a reclaim back above ${e50:.2f}", "loss of 50-day flips to strength when recovered"))
+        buys.append((f"Buy if price recovers above ${e50:.2f}",
+                     "reclaiming the 50-day average is a strength signal"))
 
-    # ── SELL triggers (resistance / measured targets on THIS chart) ───────────
+    # ── SELL triggers (resistance / measured targets / stop on THIS chart) ────
     if catalyst and catalyst.get("kind") == "earnings":
-        sells.append((f"Into the post-earnings move ({catalyst.get('when','')})",
-                      "sell the reaction; don't round-trip the report"))
+        sells.append((f"Sell into the earnings reaction ({catalyst.get('when','')})",
+                      "take the move from the report; don't hold through it both ways"))
 
     resists = []
-    if hi20 > p: resists.append((hi20, "20-day high (recent ceiling)"))
-    if hi52 > p: resists.append((hi52, "52-week high (breakout level)"))
-    resists.sort(key=lambda s: s[0] - p)            # closest first
+    if hi20 > p: resists.append((hi20, "recent 20-day high — price has stalled here before"))
+    if hi52 > p: resists.append((hi52, "52-week high — major breakout level"))
+    resists.sort(key=lambda s: s[0] - p)
     for lvl, why in resists[:2]:
-        sells.append((f"Trim into resistance ${lvl:.2f}", why))
+        sells.append((f"Sell when price reaches ${lvl:.2f}", why))
 
-    # measured target off ATR (volatility-scaled, specific to this stock)
     mult = 1.5 if tier == "short" else (3 if tier == "long" else 6)
-    sells.append((f"Measured target ${p + mult*atr:.2f}",
-                  f"entry + {mult}× its ATR (${atr:.2f}/day) — sized to its own volatility"))
-    # protective stop tied to its structure
+    sells.append((f"Sell at ${p + mult*atr:.2f} (profit target)",
+                  f"entry plus {mult}× this stock's typical daily range (${atr:.2f})"))
+
     stop = max(lo20, e50) if (lo20 < p or e50 < p) else round(p - 1.5*atr, 2)
-    sells.append((f"Cut if it loses ${stop:.2f}", "structure break — the setup is wrong below here"))
+    sells.append((f"Stop loss at ${stop:.2f}",
+                  "below this price the setup is broken — exit and reassess"))
 
     fmt = lambda lst: [{"trigger": t, "why": w} for (t, w) in lst]
     return {
         "tier": tier, "direction": direction,
         "hold_label": hold_label, "exit_rule": exit_rule,
-        "catalyst_stamp": (f"📅 {catalyst.get('when','')}" if catalyst else ""),
+        "catalyst_stamp": (f"{catalyst.get('when','')}" if catalyst else ""),
         "buy_triggers":  fmt(buys[:5]),
         "sell_triggers": fmt(sells[:5]),
     }
