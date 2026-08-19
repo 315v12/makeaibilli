@@ -1,4 +1,4 @@
-makeaibilli v4.0 (final)
+makeaibilli v3.0 (final)
 ========================
 Trading intelligence dashboard — stocks + crypto — 24/7 signal collection,
 factor-based ranking, forward projections, pre-market decision passes.
