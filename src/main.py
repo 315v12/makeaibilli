@@ -98,7 +98,7 @@ def make_decisions():
     except Exception: pass
 
 def main():
-    log.info("makeaibilli v3.0 starting (stocks + crypto)")
+    log.info("makeaibilli v4.0 starting (stocks + crypto)")
     try:
         db_init()
         log.info("SQLite store ready (30-day memory)")

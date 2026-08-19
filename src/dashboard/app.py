@@ -124,7 +124,7 @@ def header(page="stocks"):
     if page == "crypto":
         st.markdown(
             f'<div class="brand">{logo_html("crypto",40)}'
-            f'<h1>makeai<b>billi</b> <small style="color:#666;font-size:14px">crypto · v3.0</small></h1></div>',
+            f'<h1>makeai<b>billi</b> <small style="color:#666;font-size:14px">crypto · v4.0</small></h1></div>',
             unsafe_allow_html=True)
     elif page == "settings":
         st.markdown('<div class="brand"><h1>makeai<b>billi</b> ⚙️ '
@@ -133,7 +133,7 @@ def header(page="stocks"):
     else:
         st.markdown(
             f'<div class="brand">{logo_html("stocks",40)}'
-            f'<h1>makeai<b>billi</b> <small style="color:#666;font-size:14px">v3.0</small></h1></div>',
+            f'<h1>makeai<b>billi</b> <small style="color:#666;font-size:14px">v4.0</small></h1></div>',
             unsafe_allow_html=True)
     _sidenav(page)
     st.divider()

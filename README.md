@@ -8,7 +8,7 @@ buy/sell triggers before the market opens.
 **Runs entirely on your machine.** No cloud costs, no data sent anywhere,
 no ads. Your Finnhub key stays local; your database stays local.
 
-**v3.0 — final.** Honest about what software can and can't do: it ranks
+**v4.0 — final.** Honest about what software can and can't do: it ranks
 assets, projects likely ranges with confidence bands, and surfaces catalysts
 you'd otherwise miss. It does not predict exact future prices. Nothing here
 is financial advice.
@@ -110,13 +110,13 @@ without authentication.
 
 ## Step 2 — Download and extract
 
-Grab the release tarball `makeaibilli_v3.0.tar.gz` (from this repo's
+Grab the release tarball `makeaibilli_v4.0.tar.gz` (from this repo's
 Releases page or wherever you're distributing it). Put it in your home
 folder and extract:
 
 ```bash
 cd ~
-tar -xzf makeaibilli_v3.0.tar.gz
+tar -xzf makeaibilli_v4.0.tar.gz
 cd makeaibilli
 ```
 

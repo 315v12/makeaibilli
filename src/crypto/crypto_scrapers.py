@@ -11,7 +11,7 @@ from datetime import datetime
 from utils.state import push_signal, set_scraper_status
 from crypto.crypto_universe import crypto_symbols
 
-HEADERS = {"User-Agent": "Mozilla/5.0 (makeaibilli/3.0)"}
+HEADERS = {"User-Agent": "Mozilla/5.0 (makeaibilli/4.0)"}
 
 RSS = [
     "https://www.coindesk.com/arc/outboundfeeds/rss/",

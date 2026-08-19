@@ -14,7 +14,7 @@ everything (OHLC, volume, price) and is far simpler/robust on the iMac.
 import requests
 
 BASE = "https://api.exchange.coinbase.com"
-HEADERS = {"User-Agent": "makeaibilli/3.0"}
+HEADERS = {"User-Agent": "makeaibilli/4.0"}
 
 
 def get_candles(product_id: str, granularity: int = 86400) -> list:
