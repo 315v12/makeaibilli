@@ -110,13 +110,13 @@ without authentication.
 
 ## Step 2 — Download and extract
 
-Grab the release tarball `makeaibilli_v4.0.tar.gz` (from this repo's
+Grab the release tarball `makeaibilli_v3.0.tar.gz` (from this repo's
 Releases page or wherever you're distributing it). Put it in your home
 folder and extract:
 
 ```bash
 cd ~
-tar -xzf makeaibilli_v4.0.tar.gz
+tar -xzf makeaibilli_v3.0.tar.gz
 cd makeaibilli
 ```
 
