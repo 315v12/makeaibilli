@@ -8,7 +8,7 @@ buy/sell triggers before the market opens.
 **Runs entirely on your machine.** No cloud costs, no data sent anywhere,
 no ads. Your Finnhub key stays local; your database stays local.
 
-**v4.0 — final.** Honest about what software can and can't do: it ranks
+**v3.0 — final.** Honest about what software can and can't do: it ranks
 assets, projects likely ranges with confidence bands, and surfaces catalysts
 you'd otherwise miss. It does not predict exact future prices. Nothing here
 is financial advice.
